@@ -23,10 +23,12 @@ export async function startCamera({ video, canvas, frame, placeholder }: CameraO
   video.srcObject = stream;
 
   try {
-    await new Promise<void>((resolve, reject) => {
-      video.onloadedmetadata = () => resolve();
-      video.onerror = () => reject(new Error("カメラ映像を読み込めませんでした。"));
-    });
+    if (video.readyState < HTMLMediaElement.HAVE_METADATA) {
+      await new Promise<void>((resolve, reject) => {
+        video.onloadedmetadata = () => resolve();
+        video.onerror = () => reject(new Error("カメラ映像を読み込めませんでした。"));
+      });
+    }
     await video.play();
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;

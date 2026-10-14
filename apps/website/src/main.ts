@@ -51,6 +51,8 @@ async function main() {
     setStatus("解析中");
   } catch (error) {
     console.error("Face Scan の起動に失敗しました:", error);
+    stopCamera();
+    detector.stop();
     setStatus("起動できません", true);
     expression.showError(error instanceof Error ? error.message : "カメラとモデルの読み込みを確認してください。");
   }
