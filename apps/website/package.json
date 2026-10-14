@@ -11,5 +11,8 @@
   "devDependencies": {
     "typescript": "^7.0.2",
     "vite-plus": "catalog:"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^1.1.0"
   }
 }
