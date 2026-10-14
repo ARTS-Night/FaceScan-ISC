@@ -3,7 +3,7 @@ import { FaceLandmarker, FilesetResolver, type FaceLandmarkerResult } from "@med
 type DetectorOptions = {
   video: HTMLVideoElement;
   canvas: HTMLCanvasElement;
-  onResult: (result: FaceLandmarkerResult, captureFrame: () => string) => void;
+  onResult: (result: FaceLandmarkerResult, capturePhoto: () => string) => void;
 };
 
 const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.0/wasm";
@@ -42,20 +42,41 @@ export function createFaceDetector({ video, canvas, onResult }: DetectorOptions)
       const result = landmarker.detectForVideo(video, performance.now());
       const selectedFaceIndex = findClosestFaceToFrameCenter(result);
       drawFaceBounds(result, selectedFaceIndex);
-      onResult(selectFace(result, selectedFaceIndex), captureFrame);
+      onResult(selectFace(result, selectedFaceIndex), () => captureFace(result, selectedFaceIndex));
     }
     frameRequest = requestAnimationFrame(detectFrame);
   }
 
-  function captureFrame() {
+  // 顔の輪郭に余白を加えて切り出す。左右反転はカメラ表示に合わせる。
+  function captureFace(result: FaceLandmarkerResult, faceIndex: number) {
+    const landmarks = result.faceLandmarks[faceIndex];
+    if (!landmarks) return "";
+
+    const xs = landmarks.map(point => point.x * video.videoWidth);
+    const ys = landmarks.map(point => point.y * video.videoHeight);
+    const faceLeft = Math.min(...xs);
+    const faceTop = Math.min(...ys);
+    const faceWidth = Math.max(...xs) - faceLeft;
+    const faceHeight = Math.max(...ys) - faceTop;
+    const padding = Math.max(faceWidth, faceHeight) * 0.4;
+    const cropSize = Math.max(faceWidth, faceHeight) + padding * 2;
+    const centerX = faceLeft + faceWidth / 2;
+    const centerY = faceTop + faceHeight / 2;
+    const sourceX = Math.max(0, Math.min(video.videoWidth - cropSize, centerX - cropSize / 2));
+    const sourceY = Math.max(0, Math.min(video.videoHeight - cropSize, centerY - cropSize / 2));
+    const sourceWidth = Math.min(cropSize, video.videoWidth);
+    const sourceHeight = Math.min(cropSize, video.videoHeight);
+
     const photo = document.createElement("canvas");
-    photo.width = video.videoWidth;
-    photo.height = video.videoHeight;
+    photo.width = 640;
+    photo.height = 640;
     const photoContext = photo.getContext("2d")!;
+    photoContext.fillStyle = "#181916";
+    photoContext.fillRect(0, 0, photo.width, photo.height);
     photoContext.translate(photo.width, 0);
     photoContext.scale(-1, 1);
-    photoContext.drawImage(video, 0, 0, photo.width, photo.height);
-    return photo.toDataURL("image/jpeg", 0.88);
+    photoContext.drawImage(video, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, photo.width, photo.height);
+    return photo.toDataURL("image/jpeg", 0.9);
   }
 
   // 顔ランドマークの平均座標を顔の中心とし、画面中央との距離が最短の顔を選ぶ。

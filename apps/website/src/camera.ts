@@ -1,9 +1,8 @@
 type CameraOptions = {
   video: HTMLVideoElement;
   canvas: HTMLCanvasElement;
-  onStatus: (message: string) => void;
-  onReady: () => void;
-  onError: (error: unknown) => void;
+  frame: HTMLDivElement;
+  placeholder: HTMLDivElement;
 };
 
 const cameraConstraints: MediaStreamConstraints = {
@@ -15,34 +14,31 @@ const cameraConstraints: MediaStreamConstraints = {
   audio: false,
 };
 
-export function startCamera(options: CameraOptions) {
-  const { video, canvas, onStatus, onReady, onError } = options;
-  let stream: MediaStream | undefined;
-
-  async function open() {
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error("このブラウザではカメラを利用できません。HTTPS または localhost で開いてください。");
-      }
-
-      onStatus("カメラに接続中");
-      stream = await navigator.mediaDevices.getUserMedia(cameraConstraints);
-      video.srcObject = stream;
-      await new Promise<void>(resolve => { video.onloadedmetadata = () => resolve(); });
-      await video.play();
-
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      document.querySelector<HTMLDivElement>("#camera-frame")!.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
-      document.querySelector<HTMLDivElement>("#camera-placeholder")!.classList.add("is-hidden");
-      onStatus("カメラ起動中");
-      onReady();
-    } catch (error) {
-      stream?.getTracks().forEach(track => track.stop());
-      onError(error);
-    }
+export async function startCamera({ video, canvas, frame, placeholder }: CameraOptions) {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error("このブラウザではカメラを利用できません。HTTPS または localhost で開いてください。");
   }
 
-  void open();
-  return () => stream?.getTracks().forEach(track => track.stop());
+  const stream = await navigator.mediaDevices.getUserMedia(cameraConstraints);
+  video.srcObject = stream;
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      video.onloadedmetadata = () => resolve();
+      video.onerror = () => reject(new Error("カメラ映像を読み込めませんでした。"));
+    });
+    await video.play();
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    frame.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
+    placeholder.classList.add("is-hidden");
+  } catch (error) {
+    stream.getTracks().forEach(track => track.stop());
+    throw error;
+  }
+
+  return () => {
+    stream.getTracks().forEach(track => track.stop());
+    video.srcObject = null;
+  };
 }

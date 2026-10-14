@@ -5,69 +5,68 @@ type CaptureFlowOptions = {
   photo: HTMLImageElement;
   message: HTMLParagraphElement;
   onFaceResult: (result: FaceLandmarkerResult) => void;
+  getEmotion: () => string;
   secondsToCount: number;
   resultDurationMs: number;
 };
 
 export function createCaptureFlow(options: CaptureFlowOptions) {
-  const { countdown, photo, message, onFaceResult, secondsToCount, resultDurationMs } = options;
-  let countdownTimer = 0;
+  const { countdown, photo, message, onFaceResult, getEmotion, secondsToCount, resultDurationMs } = options;
   let resultTimer = 0;
   let faceFirstSeenAt: number | undefined;
   let isShowingResult = false;
+
+  function clearCountdown() {
+    faceFirstSeenAt = undefined;
+    countdown.textContent = "";
+  }
 
   function showLiveView() {
     isShowingResult = false;
     photo.classList.remove("is-visible");
     photo.removeAttribute("src");
     message.textContent = "";
-    countdown.textContent = "";
   }
 
-  function capture(result: FaceLandmarkerResult, captureFrame: () => string) {
+  function showCapturedResult(result: FaceLandmarkerResult, capturePhoto: () => string) {
     onFaceResult(result);
-    photo.src = captureFrame();
+    photo.src = capturePhoto();
     photo.classList.add("is-visible");
     countdown.textContent = "";
-    message.textContent = `あなたは「${document.querySelector("#expression-name")?.textContent ?? "通常"}」の表情でした！`;
+    message.textContent = `あなたは「${getEmotion()}」の表情でした！`;
     isShowingResult = true;
     resultTimer = window.setTimeout(showLiveView, resultDurationMs);
   }
 
-  function update(result: FaceLandmarkerResult, captureFrame: () => string) {
+  function update(result: FaceLandmarkerResult, capturePhoto: () => string) {
     const hasFace = result.faceLandmarks.length > 0;
     if (!hasFace) {
-      faceFirstSeenAt = undefined;
-      countdown.textContent = "";
-      if (isShowingResult) return;
-      onFaceResult(result);
+      clearCountdown();
+      if (!isShowingResult) onFaceResult(result);
       return;
     }
 
     if (isShowingResult) return;
     if (faceFirstSeenAt === undefined) {
       faceFirstSeenAt = performance.now();
-      countdown.textContent = String(secondsToCount);
-      return;
     }
 
     const elapsedSeconds = (performance.now() - faceFirstSeenAt) / 1000;
-    const remaining = secondsToCount - Math.floor(elapsedSeconds);
-    if (remaining > 0) {
-      countdown.textContent = String(remaining);
+    const remainingSeconds = secondsToCount - Math.floor(elapsedSeconds);
+    if (remainingSeconds > 0) {
+      countdown.textContent = String(remainingSeconds);
       return;
     }
 
-    faceFirstSeenAt = undefined;
-    onFaceResult(result);
-    capture(result, captureFrame);
+    clearCountdown();
+    showCapturedResult(result, capturePhoto);
   }
 
   return {
     update,
     dispose() {
-      window.clearTimeout(countdownTimer);
       window.clearTimeout(resultTimer);
+      clearCountdown();
       showLiveView();
     },
   };
