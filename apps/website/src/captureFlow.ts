@@ -28,12 +28,11 @@ export function createCaptureFlow(options: CaptureFlowOptions) {
     message.textContent = "";
   }
 
-  function showCapturedResult(result: FaceLandmarkerResult, capturePhoto: () => string) {
-    onFaceResult(result);
+  function showCapturedResult(capturePhoto: () => string) {
     photo.src = capturePhoto();
     photo.classList.add("is-visible");
     countdown.textContent = "";
-    message.textContent = `あなたは「${getEmotion()}」の表情でした！`;
+    message.textContent = `RESULT · ${getEmotion()}`;
     isShowingResult = true;
     resultTimer = window.setTimeout(showLiveView, resultDurationMs);
   }
@@ -47,6 +46,7 @@ export function createCaptureFlow(options: CaptureFlowOptions) {
     }
 
     if (isShowingResult) return;
+    onFaceResult(result);
     if (faceFirstSeenAt === undefined) {
       faceFirstSeenAt = performance.now();
     }
@@ -59,7 +59,7 @@ export function createCaptureFlow(options: CaptureFlowOptions) {
     }
 
     clearCountdown();
-    showCapturedResult(result, capturePhoto);
+    showCapturedResult(capturePhoto);
   }
 
   return {

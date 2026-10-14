@@ -11,7 +11,7 @@ type ExpressionView = {
 };
 
 type Emotion = "笑顔" | "悲しい" | "驚き" | "眠そう" | "怒り";
-type EmotionInfo = { icon: string; detail: string };
+type EmotionInfo = { icon: string; label: string; detail: string };
 type EmotionScores = { smile: number; sad: number; surprise: number; sleepy: number; angry: number };
 type EmotionScoreKey = keyof EmotionScores;
 
@@ -19,22 +19,23 @@ const SMOOTHING = 0.65;
 const SLEEPY_DETECTION_WEIGHT = 0.5;
 
 const emotionInfo: Record<Emotion, EmotionInfo> = {
-  "笑顔": { icon: "☺", detail: "口角が上がっています。いい笑顔ですね。" },
-  "悲しい": { icon: "☹", detail: "眉や口元が下がっているようです。" },
-  "驚き": { icon: "◉", detail: "目や口が大きく開いているようです。" },
-  "眠そう": { icon: "◡", detail: "まぶたが下がり、目が細くなっています。" },
-  "怒り": { icon: "≋", detail: "眉が寄り、口元に力が入っているようです。" },
+  "笑顔": { icon: "☺", label: "HAPPY", detail: "Smile detected" },
+  "悲しい": { icon: "☹", label: "SAD", detail: "Sad expression detected" },
+  "驚き": { icon: "◉", label: "WOW", detail: "Surprised expression detected" },
+  "眠そう": { icon: "◡", label: "SLEEPY", detail: "Sleepy expression detected" },
+  "怒り": { icon: "≋", label: "ANGRY", detail: "Angry expression detected" },
 };
-const scoreRows: { key: EmotionScoreKey; label: Emotion }[] = [
-  { key: "smile", label: "笑顔" },
-  { key: "sad", label: "悲しい" },
-  { key: "surprise", label: "驚き" },
-  { key: "sleepy", label: "眠そう" },
-  { key: "angry", label: "怒り" },
-];
+const scoreRows: EmotionScoreKey[] = ["smile", "sad", "surprise", "sleepy", "angry"];
 
 export function createExpression(view: ExpressionView) {
   let smoothedScores: EmotionScores = { smile: 0, sad: 0, surprise: 0, sleepy: 0, angry: 0 };
+  const displayedScores = scoreRows.map(() => 0);
+  const targetScores = scoreRows.map(() => 0);
+  let displayedConfidence = 0;
+  let targetConfidence = 0;
+  let hasFace = false;
+  let animationFrame = 0;
+  let previousFrameTime = 0;
 
   function getScore(result: FaceLandmarkerResult, categoryName: string) {
     return result.faceBlendshapes[0]?.categories.find(category => category.categoryName === categoryName)?.score ?? 0;
@@ -81,13 +82,11 @@ export function createExpression(view: ExpressionView) {
     view.faceHint.classList.toggle("is-hidden", hasFace);
 
     if (!hasFace) {
-      view.name.textContent = "顔が見つかりません";
+      view.name.textContent = "NO FACE";
       view.icon.textContent = "⌕";
-      view.description.textContent = "カメラの中央に顔を映してください。";
-      view.confidenceValue.textContent = "—";
-      view.confidenceFill.style.width = "0%";
+      view.description.textContent = "CENTER YOUR FACE";
       smoothedScores = { smile: 0, sad: 0, surprise: 0, sleepy: 0, angry: 0 };
-      setEmotionScores(smoothedScores, false);
+      setScoreTargets(smoothedScores, 0, false);
       return;
     }
 
@@ -97,34 +96,70 @@ export function createExpression(view: ExpressionView) {
 
   function renderEmotion(scores: EmotionScores, hasFace: boolean) {
     const [emotion, confidence] = detectEmotion(scores);
-    view.name.textContent = emotion;
+    view.name.textContent = emotionInfo[emotion].label;
     view.icon.textContent = emotionInfo[emotion].icon;
     view.description.textContent = emotionInfo[emotion].detail;
-    const percent = Math.round(Math.min(confidence, 0.99) * 100);
-    view.confidenceValue.textContent = `${percent}%`;
-    view.confidenceFill.style.width = `${percent}%`;
-    setEmotionScores(scores, hasFace);
+    setScoreTargets(scores, confidence, hasFace);
   }
 
-  function setEmotionScores(scores: EmotionScores, hasFace: boolean) {
-    scoreRows.forEach(({ key }, index) => {
-      const score = scores[key];
+  function setScoreTargets(scores: EmotionScores, confidence: number, faceDetected: boolean) {
+    hasFace = faceDetected;
+    targetConfidence = faceDetected ? Math.min(confidence, 0.99) : 0;
+    scoreRows.forEach((key, index) => { targetScores[index] = faceDetected ? scores[key] : 0; });
+    if (!faceDetected) {
+      view.confidenceValue.textContent = "—";
+      view.emotionRows.forEach(row => { row.querySelector(".emotion-score")!.textContent = "—"; });
+    }
+    if (!animationFrame) animationFrame = requestAnimationFrame(animateScores);
+  }
+
+  function animateScores(time: number) {
+    const elapsed = previousFrameTime ? time - previousFrameTime : 16;
+    const step = 1 - Math.exp(-elapsed / 120);
+    previousFrameTime = time;
+
+    displayedScores.forEach((value, index) => {
+      displayedScores[index] = approach(value, targetScores[index], step);
+      const percent = Math.round(displayedScores[index] * 100);
       const row = view.emotionRows[index];
       if (!row) return;
-      row.querySelector("i")!.style.width = `${Math.round(Math.min(score, 1) * 100)}%`;
-      row.querySelector(".emotion-score")!.textContent = hasFace ? `${Math.round(score * 100)}%` : "—";
+      row.querySelector("i")!.style.width = `${percent}%`;
+      if (hasFace) row.querySelector(".emotion-score")!.textContent = `${percent}%`;
     });
+
+    displayedConfidence = approach(displayedConfidence, targetConfidence, step);
+    view.confidenceFill.style.width = `${Math.round(displayedConfidence * 100)}%`;
+    if (hasFace) view.confidenceValue.textContent = `${Math.round(displayedConfidence * 100)}%`;
+
+    const isSettled = displayedScores.every((value, index) => Math.abs(value - targetScores[index]) < 0.005)
+      && Math.abs(displayedConfidence - targetConfidence) < 0.005;
+    if (isSettled) {
+      displayedScores.forEach((_, index) => { displayedScores[index] = targetScores[index]; });
+      displayedConfidence = targetConfidence;
+      animationFrame = 0;
+      previousFrameTime = 0;
+    } else {
+      animationFrame = requestAnimationFrame(animateScores);
+    }
+  }
+
+  function approach(current: number, target: number, step: number) {
+    const next = current + (target - current) * step;
+    return Math.abs(target - next) < 0.005 ? target : next;
   }
 
   return {
     show,
     getCurrentEmotion() {
-      return detectEmotion(smoothedScores)[0];
+      return emotionInfo[detectEmotion(smoothedScores)[0]].label;
     },
     showError(message: string) {
-      view.name.textContent = "起動できませんでした";
+      view.name.textContent = "ERROR";
       view.description.textContent = message;
     },
-    dispose() { smoothedScores = { smile: 0, sad: 0, surprise: 0, sleepy: 0, angry: 0 }; },
+    dispose() {
+      cancelAnimationFrame(animationFrame);
+      smoothedScores = { smile: 0, sad: 0, surprise: 0, sleepy: 0, angry: 0 };
+    },
   };
 }

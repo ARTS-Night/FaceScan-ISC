@@ -12,6 +12,7 @@ async function main() {
   const video = getElement<HTMLVideoElement>("#camera-video");
   const canvas = getElement<HTMLCanvasElement>("#overlay");
   const status = getElement<HTMLSpanElement>("#camera-status");
+  const focusStatus = getElement<HTMLSpanElement>("#focus-status");
   const expression = createExpression({
     faceHint: getElement<HTMLDivElement>("#face-hint"),
     name: getElement<HTMLParagraphElement>("#expression-name"),
@@ -30,7 +31,16 @@ async function main() {
     secondsToCount: 3,
     resultDurationMs: 4000,
   });
-  const detector = createFaceDetector({ video, canvas, onResult: captureFlow.update });
+  const detector = createFaceDetector({
+    video,
+    canvas,
+    onResult: (result, capturePhoto, detectedFaceCount) => {
+      focusStatus.textContent = detectedFaceCount > 0
+        ? `FOCUS · ${detectedFaceCount}`
+        : "FINDING FACE";
+      captureFlow.update(result, capturePhoto);
+    },
+  });
 
   const setStatus = (label: string, isError = false) => {
     const dotClass = isError ? "status-dot status-dot-error" : "status-dot";
@@ -39,21 +49,21 @@ async function main() {
 
   let stopCamera = () => {};
   try {
-    setStatus("カメラに接続中");
+    setStatus("CONNECTING");
     stopCamera = await startCamera({
       video,
       canvas,
       frame: getElement<HTMLDivElement>("#camera-frame"),
       placeholder: getElement<HTMLDivElement>("#camera-placeholder"),
     });
-    setStatus("カメラ起動中");
+    setStatus("CAMERA ON");
     await detector.start();
-    setStatus("解析中");
+    setStatus("SCANNING");
   } catch (error) {
     console.error("Face Scan の起動に失敗しました:", error);
     stopCamera();
     detector.stop();
-    setStatus("起動できません", true);
+    setStatus("ERROR", true);
     expression.showError(error instanceof Error ? error.message : "カメラとモデルの読み込みを確認してください。");
   }
 

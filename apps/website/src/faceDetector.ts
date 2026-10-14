@@ -3,7 +3,7 @@ import { FaceLandmarker, FilesetResolver, type FaceLandmarkerResult } from "@med
 type DetectorOptions = {
   video: HTMLVideoElement;
   canvas: HTMLCanvasElement;
-  onResult: (result: FaceLandmarkerResult, capturePhoto: () => string) => void;
+  onResult: (result: FaceLandmarkerResult, capturePhoto: () => string, detectedFaceCount: number) => void;
 };
 
 const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.0/wasm";
@@ -42,7 +42,7 @@ export function createFaceDetector({ video, canvas, onResult }: DetectorOptions)
       const result = landmarker.detectForVideo(video, performance.now());
       const selectedFaceIndex = findClosestFaceToFrameCenter(result);
       drawFaceBounds(result, selectedFaceIndex);
-      onResult(selectFace(result, selectedFaceIndex), () => captureFace(result, selectedFaceIndex));
+      onResult(selectFace(result, selectedFaceIndex), () => captureFace(result, selectedFaceIndex), result.faceLandmarks.length);
     }
     frameRequest = requestAnimationFrame(detectFrame);
   }
@@ -119,13 +119,13 @@ export function createFaceDetector({ video, canvas, onResult }: DetectorOptions)
       const height = (Math.max(...ys) - Math.min(...ys)) * canvas.height;
       const isSelected = index === selectedIndex;
 
-      context.strokeStyle = isSelected ? "#c3f264" : "#ffffff88";
+      context.strokeStyle = isSelected ? "#65f5e3" : "#ffffff70";
       context.lineWidth = isSelected ? 3 : 1.5;
       context.strokeRect(left, top, width, height);
       if (isSelected) {
-        context.fillStyle = "#c3f264";
+        context.fillStyle = "#65f5e3";
         context.font = "12px sans-serif";
-        context.fillText("中央の人", left, Math.max(16, top - 7));
+        context.fillText("FOCUS", left, Math.max(16, top - 7));
       }
     });
   }
