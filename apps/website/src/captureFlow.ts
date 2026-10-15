@@ -32,7 +32,7 @@ export function createCaptureFlow(options: CaptureFlowOptions) {
     photo.src = capturePhoto();
     photo.classList.add("is-visible");
     countdown.textContent = "";
-    message.textContent = `RESULT · ${getEmotion()}`;
+    message.textContent = `判定結果 · ${getEmotion()}`;
     isShowingResult = true;
     resultTimer = window.setTimeout(showLiveView, resultDurationMs);
   }

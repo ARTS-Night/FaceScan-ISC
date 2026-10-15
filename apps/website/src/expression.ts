@@ -19,11 +19,11 @@ const SMOOTHING = 0.65;
 const SLEEPY_DETECTION_WEIGHT = 0.5;
 
 const emotionInfo: Record<Emotion, EmotionInfo> = {
-  "笑顔": { icon: "☺", label: "HAPPY", detail: "Smile detected" },
-  "悲しい": { icon: "☹", label: "SAD", detail: "Sad expression detected" },
-  "驚き": { icon: "◉", label: "WOW", detail: "Surprised expression detected" },
-  "眠そう": { icon: "◡", label: "SLEEPY", detail: "Sleepy expression detected" },
-  "怒り": { icon: "≋", label: "ANGRY", detail: "Angry expression detected" },
+  "笑顔": { icon: "☺", label: "笑顔", detail: "笑顔を検出しました" },
+  "悲しい": { icon: "☹", label: "悲しい", detail: "悲しい表情を検出しました" },
+  "驚き": { icon: "◉", label: "驚き", detail: "驚いた表情を検出しました" },
+  "眠そう": { icon: "◡", label: "眠そう", detail: "眠そうな表情を検出しました" },
+  "怒り": { icon: "≋", label: "怒り", detail: "怒った表情を検出しました" },
 };
 const scoreRows: EmotionScoreKey[] = ["smile", "sad", "surprise", "sleepy", "angry"];
 
@@ -82,9 +82,9 @@ export function createExpression(view: ExpressionView) {
     view.faceHint.classList.toggle("is-hidden", hasFace);
 
     if (!hasFace) {
-      view.name.textContent = "NO FACE";
+      view.name.textContent = "顔が見つかりません";
       view.icon.textContent = "⌕";
-      view.description.textContent = "CENTER YOUR FACE";
+      view.description.textContent = "カメラに顔を向けてください";
       smoothedScores = { smile: 0, sad: 0, surprise: 0, sleepy: 0, angry: 0 };
       setScoreTargets(smoothedScores, 0, false);
       return;

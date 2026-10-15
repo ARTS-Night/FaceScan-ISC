@@ -333,7 +333,7 @@ body {
 .meter-fill, .mini-meter i { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--violet), var(--cyan)); transition: width .2s ease; }
 
 .emotion-list { display: grid; gap: 11px; padding-top: 17px; border-top: 1px solid #ffffff16; }
-.emotion-row { display: grid; grid-template-columns: 6ch minmax(0, 1fr) 4ch; align-items: center; gap: 10px; min-width: 0; color: #cbd5e5; font-size: 10px; }
+.emotion-row { display: grid; grid-template-columns: 4em minmax(0, 1fr) 4ch; align-items: center; gap: 10px; min-width: 0; color: #cbd5e5; font-size: 10px; }
 .mini-meter { height: 3px; }
 .emotion-score { color: var(--muted); font-family: var(--mono); font-size: 9px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .privacy-note { height: 12px; margin: 0; color: #758198; font-size: 8px; letter-spacing: .04em; text-align: center; }
@@ -360,7 +360,7 @@ body {
   .camera-frame, .result-panel { border-radius: 12px; }
   .camera-tag { top: 18px; left: 18px; }
   .face-hint { bottom: 18px; font-size: 10px; }
-  .emotion-row { grid-template-columns: 6ch minmax(0, 1fr) 4ch; gap: 7px; }
+  .emotion-row { grid-template-columns: 4em minmax(0, 1fr) 4ch; gap: 7px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

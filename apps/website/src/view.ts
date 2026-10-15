@@ -24,18 +24,18 @@ export function renderApp(root: HTMLDivElement) {
         <section class="result-panel" aria-live="polite">
           <p class="capture-message" id="capture-message"></p>
           <div class="expression-icon" id="expression-icon">◎</div>
-          <p class="expression-name" id="expression-name">SCANNING</p>
-          <p class="expression-description" id="expression-description">LOOK AT CAMERA</p>
+          <p class="expression-name" id="expression-name">判定中</p>
+          <p class="expression-description" id="expression-description">カメラに顔を向けてください</p>
           <div class="confidence">
             <div class="confidence-heading"><span>SCORE</span><span id="confidence-value">—</span></div>
             <div class="meter"><div class="meter-fill" id="confidence-fill"></div></div>
           </div>
           <div class="emotion-list">
-            <div class="emotion-row"><span>HAPPY</span><div class="mini-meter"><i></i></div><span class="emotion-score">—</span></div>
-            <div class="emotion-row"><span>SAD</span><div class="mini-meter"><i></i></div><span class="emotion-score">—</span></div>
-            <div class="emotion-row"><span>WOW</span><div class="mini-meter"><i></i></div><span class="emotion-score">—</span></div>
-            <div class="emotion-row"><span>SLEEPY</span><div class="mini-meter"><i></i></div><span class="emotion-score">—</span></div>
-            <div class="emotion-row"><span>ANGRY</span><div class="mini-meter"><i></i></div><span class="emotion-score">—</span></div>
+            <div class="emotion-row"><span>笑顔</span><div class="mini-meter"><i></i></div><span class="emotion-score">—</span></div>
+            <div class="emotion-row"><span>悲しい</span><div class="mini-meter"><i></i></div><span class="emotion-score">—</span></div>
+            <div class="emotion-row"><span>驚き</span><div class="mini-meter"><i></i></div><span class="emotion-score">—</span></div>
+            <div class="emotion-row"><span>眠そう</span><div class="mini-meter"><i></i></div><span class="emotion-score">—</span></div>
+            <div class="emotion-row"><span>怒り</span><div class="mini-meter"><i></i></div><span class="emotion-score">—</span></div>
           </div>
           <p class="privacy-note">ON DEVICE · NOT SAVED</p>
         </section>
