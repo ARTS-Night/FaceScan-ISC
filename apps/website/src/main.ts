@@ -21,15 +21,16 @@ async function main() {
     confidenceValue: getElement<HTMLSpanElement>("#confidence-value"),
     confidenceFill: getElement<HTMLDivElement>("#confidence-fill"),
     emotionRows: getElements<HTMLDivElement>(".emotion-row"),
+    emotionInputs: getElements<HTMLInputElement>("[data-emotion]"),
   });
   const captureFlow = createCaptureFlow({
     countdown: getElement<HTMLDivElement>("#countdown-overlay"),
     photo: getElement<HTMLImageElement>("#captured-photo"),
     message: getElement<HTMLParagraphElement>("#capture-message"),
+    retakeButton: getElement<HTMLButtonElement>("#retake-button"),
     onFaceResult: expression.show,
-    getEmotion: expression.getCurrentEmotion,
+    getResultMessage: () => expression.getResultMessage(),
     secondsToCount: 3,
-    resultDurationMs: 4000,
   });
   const detector = createFaceDetector({
     video,

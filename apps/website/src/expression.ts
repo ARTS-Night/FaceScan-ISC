@@ -8,27 +8,44 @@ type ExpressionView = {
   confidenceValue: HTMLSpanElement;
   confidenceFill: HTMLDivElement;
   emotionRows: HTMLDivElement[];
+  emotionInputs: HTMLInputElement[];
 };
 
-type Emotion = "笑顔" | "悲しい" | "驚き" | "眠そう" | "怒り";
+type Emotion = "真顔" | "笑顔" | "悲しい" | "驚き" | "眠そう" | "怒り";
 type EmotionInfo = { icon: string; label: string; detail: string };
-type EmotionScores = { smile: number; sad: number; surprise: number; sleepy: number; angry: number };
+type EmotionScores = { neutral: number; smile: number; sad: number; surprise: number; sleepy: number; angry: number };
 type EmotionScoreKey = keyof EmotionScores;
 
 const SMOOTHING = 0.65;
 const SLEEPY_DETECTION_WEIGHT = 0.5;
 
 const emotionInfo: Record<Emotion, EmotionInfo> = {
+  "真顔": { icon: "○", label: "真顔", detail: "目立った表情の変化はありません" },
   "笑顔": { icon: "☺", label: "笑顔", detail: "笑顔を検出しました" },
   "悲しい": { icon: "☹", label: "悲しい", detail: "悲しい表情を検出しました" },
   "驚き": { icon: "◉", label: "驚き", detail: "驚いた表情を検出しました" },
   "眠そう": { icon: "◡", label: "眠そう", detail: "眠そうな表情を検出しました" },
   "怒り": { icon: "≋", label: "怒り", detail: "怒った表情を検出しました" },
 };
-const scoreRows: EmotionScoreKey[] = ["smile", "sad", "surprise", "sleepy", "angry"];
+const scoreRows: EmotionScoreKey[] = ["neutral", "smile", "sad", "surprise", "sleepy", "angry"];
+const emotionNames: Emotion[] = ["真顔", "笑顔", "悲しい", "驚き", "眠そう", "怒り"];
+const settingsKey = "face-scan-emotion-messages";
 
 export function createExpression(view: ExpressionView) {
-  let smoothedScores: EmotionScores = { smile: 0, sad: 0, surprise: 0, sleepy: 0, angry: 0 };
+  let smoothedScores: EmotionScores = { neutral: 0, smile: 0, sad: 0, surprise: 0, sleepy: 0, angry: 0 };
+  let customMessages: Record<string, string> = {};
+  try {
+    const saved = JSON.parse(localStorage.getItem(settingsKey) ?? "{}");
+    if (saved && typeof saved === "object" && !Array.isArray(saved)) customMessages = saved;
+  } catch { /* 設定が読めない場合は初期値を使う */ }
+  view.emotionInputs.forEach((input, index) => {
+    input.value = typeof customMessages[emotionNames[index]] === "string" ? customMessages[emotionNames[index]].slice(0, 40) : "";
+    input.addEventListener("input", () => {
+      customMessages[emotionNames[index]] = input.value.slice(0, 40);
+      input.value = customMessages[emotionNames[index]];
+      try { localStorage.setItem(settingsKey, JSON.stringify(customMessages)); } catch { /* 保存できない環境でも入力中は反映する */ }
+    });
+  });
   const displayedScores = scoreRows.map(() => 0);
   const targetScores = scoreRows.map(() => 0);
   let displayedConfidence = 0;
@@ -55,11 +72,14 @@ export function createExpression(view: ExpressionView) {
     const sad = Math.min(1, browInnerUp * 0.45 + frown * 0.4 + browDown * 0.15);
     const angry = Math.min(1, browDown * 0.5 + frown * 0.3 + noseSneer * 0.2);
 
-    return { smile, sad, surprise, sleepy, angry };
+    const expressive = Math.max(smile, sad, surprise, sleepy * SLEEPY_DETECTION_WEIGHT, angry);
+    const neutral = Math.max(0, 0.2 - expressive) / 0.2;
+    return { neutral, smile, sad, surprise, sleepy, angry };
   }
 
   function smoothScores(current: EmotionScores) {
     smoothedScores = {
+      neutral: smoothedScores.neutral * SMOOTHING + current.neutral * (1 - SMOOTHING),
       smile: smoothedScores.smile * SMOOTHING + current.smile * (1 - SMOOTHING),
       sad: smoothedScores.sad * SMOOTHING + current.sad * (1 - SMOOTHING),
       surprise: smoothedScores.surprise * SMOOTHING + current.surprise * (1 - SMOOTHING),
@@ -71,6 +91,7 @@ export function createExpression(view: ExpressionView) {
 
   function detectEmotion(scores: EmotionScores): [Emotion, number] {
     const candidates: [Emotion, number][] = [
+      ["真顔", scores.neutral],
       ["笑顔", scores.smile], ["悲しい", scores.sad], ["驚き", scores.surprise],
       ["眠そう", scores.sleepy * SLEEPY_DETECTION_WEIGHT], ["怒り", scores.angry],
     ];
@@ -85,7 +106,7 @@ export function createExpression(view: ExpressionView) {
       view.name.textContent = "顔が見つかりません";
       view.icon.textContent = "⌕";
       view.description.textContent = "カメラに顔を向けてください";
-      smoothedScores = { smile: 0, sad: 0, surprise: 0, sleepy: 0, angry: 0 };
+      smoothedScores = { neutral: 0, smile: 0, sad: 0, surprise: 0, sleepy: 0, angry: 0 };
       setScoreTargets(smoothedScores, 0, false);
       return;
     }
@@ -150,8 +171,10 @@ export function createExpression(view: ExpressionView) {
 
   return {
     show,
-    getCurrentEmotion() {
-      return emotionInfo[detectEmotion(smoothedScores)[0]].label;
+    getResultMessage() {
+      const emotion = detectEmotion(smoothedScores)[0];
+      const customMessage = customMessages[emotion]?.trim();
+      return customMessage ? `${emotion}：${customMessage}` : emotion;
     },
     showError(message: string) {
       view.name.textContent = "ERROR";
@@ -159,7 +182,7 @@ export function createExpression(view: ExpressionView) {
     },
     dispose() {
       cancelAnimationFrame(animationFrame);
-      smoothedScores = { smile: 0, sad: 0, surprise: 0, sleepy: 0, angry: 0 };
+      smoothedScores = { neutral: 0, smile: 0, sad: 0, surprise: 0, sleepy: 0, angry: 0 };
     },
   };
 }

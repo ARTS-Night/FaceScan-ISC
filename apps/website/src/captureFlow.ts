@@ -4,15 +4,14 @@ type CaptureFlowOptions = {
   countdown: HTMLDivElement;
   photo: HTMLImageElement;
   message: HTMLParagraphElement;
+  retakeButton: HTMLButtonElement;
   onFaceResult: (result: FaceLandmarkerResult) => void;
-  getEmotion: () => string;
+  getResultMessage: () => string;
   secondsToCount: number;
-  resultDurationMs: number;
 };
 
 export function createCaptureFlow(options: CaptureFlowOptions) {
-  const { countdown, photo, message, onFaceResult, getEmotion, secondsToCount, resultDurationMs } = options;
-  let resultTimer = 0;
+  const { countdown, photo, message, retakeButton, onFaceResult, getResultMessage, secondsToCount } = options;
   let faceFirstSeenAt: number | undefined;
   let isShowingResult = false;
 
@@ -26,15 +25,16 @@ export function createCaptureFlow(options: CaptureFlowOptions) {
     photo.classList.remove("is-visible");
     photo.removeAttribute("src");
     message.textContent = "";
+    retakeButton.hidden = true;
   }
 
   function showCapturedResult(capturePhoto: () => string) {
     photo.src = capturePhoto();
     photo.classList.add("is-visible");
     countdown.textContent = "";
-    message.textContent = `判定結果 · ${getEmotion()}`;
+    message.textContent = `判定結果 · ${getResultMessage()}`;
+    retakeButton.hidden = false;
     isShowingResult = true;
-    resultTimer = window.setTimeout(showLiveView, resultDurationMs);
   }
 
   function update(result: FaceLandmarkerResult, capturePhoto: () => string) {
@@ -62,10 +62,11 @@ export function createCaptureFlow(options: CaptureFlowOptions) {
     showCapturedResult(capturePhoto);
   }
 
+  retakeButton.addEventListener("click", showLiveView);
+
   return {
     update,
     dispose() {
-      window.clearTimeout(resultTimer);
       clearCountdown();
       showLiveView();
     },
