@@ -1,18 +1,55 @@
 {
   "name": "website",
+  "desktopName": "facescan",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vp dev",
     "build": "tsc && vp build",
+    "build:desktop": "tsc && vp build --mode desktop",
+    "desktop": "bun run build:desktop && electron .",
+    "package:deb": "umask 022 && bun run build:desktop && electron-builder --linux deb --x64",
     "preview": "vp preview"
   },
   "devDependencies": {
+    "electron": "45.0.0",
+    "electron-builder": "26.15.3",
     "typescript": "^7.0.2",
     "vite-plus": "catalog:"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.1.0"
+  },
+  "main": "electron/main.cjs",
+  "homepage": "https://github.com/ARTS-Night/FaceScan-ISC",
+  "description": "Ubuntu desktop app for real-time face expression scanning",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ARTS-Night/FaceScan-ISC.git"
+  },
+  "build": {
+    "appId": "jp.artsnight.facescan",
+    "productName": "FaceScan",
+    "publish": [],
+    "directories": {
+      "output": "../../dist/deb"
+    },
+    "files": [
+      "dist/desktop/**/*",
+      "electron/main.cjs",
+      "package.json"
+    ],
+    "deb": {
+      "maintainer": "ARTS-Night",
+      "packageName": "facescan",
+      "artifactName": "FaceScan-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "category": "Graphics",
+      "executableName": "facescan",
+      "syncDesktopName": true,
+      "target": ["deb"]
+    }
   }
 }

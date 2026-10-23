@@ -1,9 +1,9 @@
 import { defineConfig } from "vite-plus";
 
-export default defineConfig(({ command }) => ({
-  base: command === "build" ? "/FaceScan-ISC/" : "/",
+export default defineConfig(({ command, mode }) => ({
+  base: mode === "desktop" ? "./" : command === "build" ? "/FaceScan-ISC/" : "/",
   build: {
-    outDir: "../../docs",
+    outDir: mode === "desktop" ? "dist/desktop" : "../../docs",
     emptyOutDir: true,
   },
 }));
