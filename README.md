@@ -50,5 +50,11 @@ bun run package:deb
 
 The package is written to `dist/deb/FaceScan-0.0.0-amd64.deb`. Install it with
 `sudo apt install ./dist/deb/FaceScan-0.0.0-amd64.deb` from the repository root.
+
+GitHub Actions also builds the package on pushes to `main` and
+`ubuntu-gui-check`, on pull requests to `main`, and when started manually.
+Download `FaceScan-ubuntu-x64-deb` from the run's **Artifacts** section on the
+Actions page. Workflow artifacts are retained for 30 days.
+
 The app needs an Ubuntu graphical session and camera permission. MediaPipe's
 WASM and face model are fetched from the network when the app starts.
