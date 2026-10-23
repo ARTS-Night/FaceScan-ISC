@@ -10,7 +10,7 @@
     "build": "tsc && vp build",
     "build:desktop": "tsc && vp build --mode desktop",
     "desktop": "bun run build:desktop && electron .",
-    "package:deb": "umask 022 && bun run build:desktop && electron-builder --linux deb --x64",
+    "package:deb": "umask 022 && bun run build:desktop && electron-builder --linux deb --x64 --publish never",
     "preview": "vp preview"
   },
   "devDependencies": {
