@@ -3,6 +3,7 @@
   "desktopName": "facescan",
   "version": "0.0.0",
   "private": true,
+  "author": "ARTS-Night",
   "type": "module",
   "scripts": {
     "dev": "vp dev",
