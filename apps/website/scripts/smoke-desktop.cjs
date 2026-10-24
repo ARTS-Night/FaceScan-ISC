@@ -11,13 +11,19 @@ async function main() {
   // Deny HTTP and HTTPS from process startup, before camera/model initialization.
   // Reloading a renderer during WASM initialization can block the CDP response.
   const probes = { http: 0, https: 0 };
+  const blackhole = process.env.SMOKE_NETWORK_MODE === "blackhole";
+  const proxySockets = new Set();
   const proxy = http.createServer((request) => {
     if (request.url.startsWith("http://facescan-smoke.invalid/")) probes.http++;
-    request.destroy();
+    if (!blackhole) request.destroy();
   });
   proxy.on("connect", (request, socket) => {
     if (request.url === "facescan-smoke.invalid:443") probes.https++;
-    socket.destroy();
+    if (!blackhole) socket.destroy();
+  });
+  proxy.on("connection", (socket) => {
+    proxySockets.add(socket);
+    socket.once("close", () => proxySockets.delete(socket));
   });
   await new Promise((resolve, reject) => {
     proxy.once("error", reject);
@@ -159,7 +165,14 @@ async function main() {
           ? consecutive + 1
           : 0;
       if (consecutive >= 3) {
-        // Prove that both protocols reach the denying proxy, including before any reload.
+        const fonts = await call("Runtime.evaluate", {
+          expression: `Promise.all([document.fonts.load('400 16px "Noto Sans JP Variable"', "表情判定再試行"), document.fonts.load('500 16px "DM Mono"', "SCANNING")]).then(groups => groups.every(fonts => fonts.length > 0 && fonts.every(font => font.status === "loaded")))`,
+          awaitPromise: true,
+          returnByValue: true,
+        });
+        if (fonts.exceptionDetails || fonts.result.value !== true)
+          throw new Error("Bundled fonts did not load offline");
+        // Requests may be denied by the desktop app itself or by the startup proxy.
         const offline = await call("Runtime.evaluate", {
           expression:
             'Promise.all(["http://facescan-smoke.invalid/", "https://facescan-smoke.invalid/"].map(url => fetch(url, {signal: AbortSignal.timeout(5000)}).then(() => false, () => true)))',
@@ -168,14 +181,13 @@ async function main() {
         });
         if (
           offline.exceptionDetails ||
-          !offline.result.value?.every(Boolean) ||
-          !probes.http ||
-          !probes.https
+          offline.result.value?.length !== 2 ||
+          !offline.result.value.every(Boolean)
         ) {
           throw new Error(`Offline check failed: ${JSON.stringify({ offline, probes })}`);
         }
         console.log(
-          "Offline packaged camera and face detector: PASS (HTTP/HTTPS blocked from startup)",
+          "Offline packaged camera and face detector: PASS (model, WASM and fonts; HTTP/HTTPS unavailable from startup)",
         );
         return;
       }
@@ -199,6 +211,7 @@ async function main() {
         await exited;
       }
     }
+    for (const connection of proxySockets) connection.destroy();
     proxy.closeAllConnections();
     await new Promise((resolve) => proxy.close(resolve));
     if (process.env.SMOKE_LOG_PATH) writeFileSync(process.env.SMOKE_LOG_PATH, log);

@@ -19,6 +19,11 @@ if (!app.requestSingleInstanceLock()) {
   app
     .whenReady()
     .then(async () => {
+      // All application assets are local, including fonts, models and WASM.
+      session.defaultSession.webRequest.onBeforeRequest(
+        { urls: ["http://*/*", "https://*/*", "ws://*/*", "wss://*/*"] },
+        (_details, callback) => callback({ cancel: true }),
+      );
       protocol.handle("facescan", async (request) => {
         try {
           const filename = resolveAsset(assetRoot, request.url);
@@ -53,6 +58,7 @@ if (!app.requestSingleInstanceLock()) {
       );
 
       const window = new BrowserWindow({
+        title: `FaceScan ${app.getVersion()}`,
         width: 1280,
         height: 900,
         minWidth: 800,
@@ -60,6 +66,7 @@ if (!app.requestSingleInstanceLock()) {
         backgroundColor: "#10110f",
         webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
       });
+      window.webContents.on("page-title-updated", (event) => event.preventDefault());
       window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
       window.webContents.on("will-navigate", (event) => event.preventDefault());
       window.webContents.on("render-process-gone", async (_event, details) => {

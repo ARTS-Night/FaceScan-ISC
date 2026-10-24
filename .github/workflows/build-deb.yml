@@ -46,6 +46,11 @@ jobs:
         run: bun run package:deb
         working-directory: apps/website
 
+      - name: Verify assets inside the Debian package
+        run: |
+          dpkg-deb -x dist/deb/FaceScan-*-amd64.deb /tmp/facescan-assets-check
+          node apps/website/scripts/verify-package.cjs /tmp/facescan-assets-check/opt/FaceScan/resources/app.asar
+
       - name: Upload Debian package
         uses: actions/upload-artifact@v4
         with:
@@ -81,11 +86,24 @@ jobs:
           SMOKE_LOG_PATH: facescan-smoke.log
         run: xvfb-run -a node apps/website/scripts/smoke-desktop.cjs /opt/FaceScan/facescan
 
+      - name: Check startup with unresponsive external networking
+        env:
+          SMOKE_LOG_PATH: facescan-smoke-blackhole.log
+          SMOKE_NETWORK_MODE: blackhole
+        run: xvfb-run -a node apps/website/scripts/smoke-desktop.cjs /opt/FaceScan/facescan
+
+      - name: Check cold startup with no external network interfaces
+        run: |
+          sudo unshare --net bash -c '
+            ip link set lo up
+            exec runuser -u "$1" -- env SMOKE_LOG_PATH="$2" xvfb-run -a "$3" "$4" /opt/FaceScan/facescan
+          ' bash "$(id -un)" "$PWD/facescan-smoke-isolated.log" "$(command -v node)" "$PWD/apps/website/scripts/smoke-desktop.cjs"
+
       - name: Upload startup diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: FaceScan-smoke-${{ matrix.os }}
-          path: facescan-smoke.log
+          path: facescan-smoke*.log
           if-no-files-found: ignore
           retention-days: 7

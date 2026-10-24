@@ -1,4 +1,4 @@
-const { cp, mkdir, writeFile } = require("node:fs/promises");
+const { cp, mkdir, writeFile, readdir, readFile } = require("node:fs/promises");
 const { createHash } = require("node:crypto");
 const path = require("node:path");
 
@@ -18,6 +18,36 @@ async function main() {
     throw new Error("Face model checksum mismatch");
   }
   await writeFile(path.join(target, "face_landmarker.task"), data);
+  const root = path.dirname(target);
+  const licenses = path.join(root, "licenses");
+  await mkdir(licenses, { recursive: true });
+  for (const [font, filename] of [
+    ["@fontsource-variable/noto-sans-jp", "Noto-Sans-JP.txt"],
+    ["@fontsource/dm-mono", "DM-Mono.txt"],
+  ]) {
+    await cp(
+      path.join(path.dirname(require.resolve(font)), "LICENSE"),
+      path.join(licenses, filename),
+    );
+  }
+  const files = {};
+  async function collect(directory, prefix = "") {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const relative = `${prefix}${entry.name}`;
+      const filename = path.join(directory, entry.name);
+      if (entry.isDirectory()) await collect(filename, `${relative}/`);
+      else if (relative !== "asset-manifest.json")
+        files[relative] = createHash("sha256")
+          .update(await readFile(filename))
+          .digest("hex");
+    }
+  }
+  await collect(root);
+  const { version } = require("../package.json");
+  await writeFile(
+    path.join(root, "asset-manifest.json"),
+    JSON.stringify({ version, files }, null, 2),
+  );
 }
 
 main().catch((error) => {

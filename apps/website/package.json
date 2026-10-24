@@ -1,6 +1,6 @@
 {
   "name": "website",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Ubuntu desktop app for real-time face expression scanning",
   "homepage": "https://github.com/ARTS-Night/FaceScan-ISC",
@@ -16,15 +16,18 @@
     "build": "tsc && vp build",
     "build:desktop": "tsc && vp build --mode desktop && node scripts/prepare-desktop.cjs",
     "desktop": "bun run build:desktop && electron .",
-    "package:deb": "umask 022 && bun run build:desktop && electron-builder --linux deb --x64 --publish never",
+    "package:deb": "umask 022 && bun run build:desktop && electron-builder --linux deb --x64 --publish never && node scripts/verify-package.cjs ../../dist/deb/linux-unpacked/resources/app.asar",
     "preview": "vp preview",
     "test:desktop": "node --test electron/*.node.cjs",
     "test": "vp test tests && node --test electron/*.node.cjs"
   },
   "dependencies": {
+    "@fontsource-variable/noto-sans-jp": "5.3.1",
+    "@fontsource/dm-mono": "5.3.0",
     "@mediapipe/tasks-vision": "^1.1.0"
   },
   "devDependencies": {
+    "@electron/asar": "3.4.1",
     "electron": "45.0.0",
     "electron-builder": "26.15.3",
     "typescript": "^7.0.2",
@@ -60,9 +63,6 @@
         "libgbm1",
         "libxkbcommon0",
         "libasound2t64 | libasound2"
-      ],
-      "recommends": [
-        "fonts-noto-cjk"
       ]
     },
     "linux": {
