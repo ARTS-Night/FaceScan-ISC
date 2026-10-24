@@ -82,14 +82,25 @@ test("camera stop removes disconnect listeners and releases tracks", async () =>
   expect(track.stop).toHaveBeenCalledOnce();
 });
 
-function detector() {
+function detector(renderer: string | null = "ANGLE (Intel GPU)") {
   const options = {
     video: { videoWidth: 640, readyState: 2, currentTime: 1 },
     canvas: { getContext: () => ({ clearRect: vi.fn() }) },
     onError: vi.fn(),
     onResult: vi.fn(),
   };
-  vi.stubGlobal("document", { hidden: false });
+  const gl =
+    renderer === null
+      ? null
+      : {
+          RENDERER: 1,
+          getParameter: () => renderer,
+          getExtension: (name: string) =>
+            name === "WEBGL_debug_renderer_info"
+              ? { UNMASKED_RENDERER_WEBGL: 2 }
+              : { loseContext: vi.fn() },
+        };
+  vi.stubGlobal("document", { hidden: false, createElement: () => ({ getContext: () => gl }) });
   return { instance: createFaceDetector(options as never), options };
 }
 
@@ -137,3 +148,16 @@ test("a GPU runtime failure switches to CPU, and CPU errors stop with a visible 
   instance.stop();
   expect(cpu.close).toHaveBeenCalledOnce();
 });
+
+test.each(["ANGLE (Google, Vulkan SwiftShader Device)", "llvmpipe (LLVM 15.0)", null])(
+  "software or missing WebGL starts directly on CPU: %s",
+  async (renderer) => {
+    const model = { close: vi.fn() };
+    mocks.create.mockResolvedValue(model);
+    const { instance } = detector(renderer);
+    await instance.start();
+    expect(mocks.create).toHaveBeenCalledOnce();
+    expect(mocks.create.mock.calls[0][1].baseOptions.delegate).toBe("CPU");
+    instance.stop();
+  },
+);

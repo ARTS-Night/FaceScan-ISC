@@ -26,6 +26,21 @@ const MODEL_URL =
 const MAX_FACES = 6;
 const FRAME_CENTER = { x: 0.5, y: 0.5 };
 
+// Software OpenGL can accept GPU tasks but stall while compiling inference shaders.
+// Keep GPU inference for hardware renderers and use CPU on virtual/software graphics.
+function preferredDelegate(): "GPU" | "CPU" {
+  const probe = document.createElement("canvas");
+  const gl = probe.getContext("webgl2");
+  if (!gl) return "CPU";
+  try {
+    const debug = gl.getExtension("WEBGL_debug_renderer_info");
+    const renderer = String(gl.getParameter(debug?.UNMASKED_RENDERER_WEBGL ?? gl.RENDERER));
+    return /swiftshader|llvmpipe|softpipe|software/i.test(renderer) ? "CPU" : "GPU";
+  } finally {
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+  }
+}
+
 export function createFaceDetector({ video, canvas, onResult, onError }: DetectorOptions) {
   const context = canvas.getContext("2d");
   let landmarker: FaceLandmarker | undefined;
@@ -213,6 +228,8 @@ export function createFaceDetector({ video, canvas, onResult, onError }: Detecto
     async start() {
       if (!context) throw new Error("描画機能を利用できません。");
       stopped = false;
+      delegate = preferredDelegate();
+      console.info("Face detector backend:", delegate);
       const loaded = await loadLandmarker();
       if (stopped) {
         loaded.close();

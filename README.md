@@ -66,10 +66,12 @@ it can scan without Internet access. Building the desktop package downloads the
 model over HTTPS and verifies its SHA-256 checksum. The browser build still
 loads these assets from the network.
 
-GPU initialization or detection failures fall back to CPU processing. If camera
+Software graphics (including SwiftShader and llvmpipe) start with CPU inference.
+Hardware GPU initialization or detection failures fall back to CPU processing. If camera
 access fails or the device disconnects, the app releases resources and offers
 **再試行**. Permission requests and camera startup time out after 30 seconds.
 
-Actions checks installation and offline initialization using a virtual camera
+Actions blocks HTTP/HTTPS from application startup and checks that both protocols
+are denied. It checks installation and offline initialization using a virtual camera
 and software graphics on Ubuntu 22.04 and 24.04. Physical cameras, vendor GPU
 drivers, and Wayland sessions still need checks on the target machines.
