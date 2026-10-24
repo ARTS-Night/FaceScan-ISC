@@ -1,33 +1,34 @@
 {
   "name": "website",
-  "desktopName": "facescan",
   "version": "0.0.0",
   "private": true,
+  "description": "Ubuntu desktop app for real-time face expression scanning",
+  "homepage": "https://github.com/ARTS-Night/FaceScan-ISC",
   "author": "ARTS-Night",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ARTS-Night/FaceScan-ISC.git"
+  },
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vp dev",
     "build": "tsc && vp build",
-    "build:desktop": "tsc && vp build --mode desktop",
+    "build:desktop": "tsc && vp build --mode desktop && node scripts/prepare-desktop.cjs",
     "desktop": "bun run build:desktop && electron .",
     "package:deb": "umask 022 && bun run build:desktop && electron-builder --linux deb --x64 --publish never",
-    "preview": "vp preview"
+    "preview": "vp preview",
+    "test:desktop": "node --test electron/*.node.cjs",
+    "test": "vp test tests && node --test electron/*.node.cjs"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^1.1.0"
   },
   "devDependencies": {
     "electron": "45.0.0",
     "electron-builder": "26.15.3",
     "typescript": "^7.0.2",
     "vite-plus": "catalog:"
-  },
-  "dependencies": {
-    "@mediapipe/tasks-vision": "^1.1.0"
-  },
-  "main": "electron/main.cjs",
-  "homepage": "https://github.com/ARTS-Night/FaceScan-ISC",
-  "description": "Ubuntu desktop app for real-time face expression scanning",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/ARTS-Night/FaceScan-ISC.git"
   },
   "build": {
     "appId": "jp.artsnight.facescan",
@@ -39,18 +40,39 @@
     "files": [
       "dist/desktop/**/*",
       "electron/main.cjs",
+      "electron/assets.cjs",
       "package.json"
     ],
     "deb": {
       "maintainer": "ARTS-Night",
       "packageName": "facescan",
-      "artifactName": "FaceScan-${version}-${arch}.${ext}"
+      "artifactName": "FaceScan-${version}-${arch}.${ext}",
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libuuid1",
+        "libsecret-1-0",
+        "libgbm1",
+        "libxkbcommon0",
+        "libasound2t64 | libasound2"
+      ],
+      "recommends": [
+        "fonts-noto-cjk"
+      ]
     },
     "linux": {
       "category": "Graphics",
       "executableName": "facescan",
       "syncDesktopName": true,
-      "target": ["deb"]
+      "target": [
+        "deb"
+      ]
     }
-  }
+  },
+  "desktopName": "facescan"
 }

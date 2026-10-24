@@ -1,21 +1,39 @@
-import { FaceLandmarker, FilesetResolver, type FaceLandmarkerResult } from "@mediapipe/tasks-vision";
+import {
+  FaceLandmarker,
+  FilesetResolver,
+  type FaceLandmarkerResult,
+} from "@mediapipe/tasks-vision";
 
 type DetectorOptions = {
   video: HTMLVideoElement;
   canvas: HTMLCanvasElement;
-  onResult: (result: FaceLandmarkerResult, capturePhoto: () => string, detectedFaceCount: number) => void;
+  onError: (error: unknown) => void;
+  onResult: (
+    result: FaceLandmarkerResult,
+    capturePhoto: () => string,
+    detectedFaceCount: number,
+  ) => void;
 };
 
-const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.0/wasm";
-const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
+const WASM_URL =
+  import.meta.env.MODE === "desktop"
+    ? new URL("./mediapipe/wasm", document.baseURI).href
+    : "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.0/wasm";
+const MODEL_URL =
+  import.meta.env.MODE === "desktop"
+    ? new URL("./mediapipe/face_landmarker.task", document.baseURI).href
+    : "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
 const MAX_FACES = 6;
 const FRAME_CENTER = { x: 0.5, y: 0.5 };
 
-export function createFaceDetector({ video, canvas, onResult }: DetectorOptions) {
-  const context = canvas.getContext("2d")!;
+export function createFaceDetector({ video, canvas, onResult, onError }: DetectorOptions) {
+  const context = canvas.getContext("2d");
   let landmarker: FaceLandmarker | undefined;
   let frameRequest = 0;
   let lastVideoTime = -1;
+
+  let stopped = false;
+  let delegate: "GPU" | "CPU" = "GPU";
 
   async function loadLandmarker() {
     const wasm = await FilesetResolver.forVisionTasks(WASM_URL);
@@ -23,12 +41,14 @@ export function createFaceDetector({ video, canvas, onResult }: DetectorOptions)
       runningMode: "VIDEO" as const,
       numFaces: MAX_FACES,
       outputFaceBlendshapes: true,
-      baseOptions: { modelAssetPath: MODEL_URL, delegate: "GPU" as const },
+      baseOptions: { modelAssetPath: MODEL_URL, delegate },
     };
 
     try {
       return await FaceLandmarker.createFromOptions(wasm, options);
-    } catch {
+    } catch (error) {
+      if (delegate === "CPU") throw error;
+      delegate = "CPU";
       return FaceLandmarker.createFromOptions(wasm, {
         ...options,
         baseOptions: { modelAssetPath: MODEL_URL, delegate: "CPU" },
@@ -36,15 +56,59 @@ export function createFaceDetector({ video, canvas, onResult }: DetectorOptions)
     }
   }
 
-  function detectFrame() {
-    if (landmarker && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.currentTime !== lastVideoTime) {
-      lastVideoTime = video.currentTime;
-      const result = landmarker.detectForVideo(video, performance.now());
-      const selectedFaceIndex = findClosestFaceToFrameCenter(result);
-      drawFaceBounds(result, selectedFaceIndex);
-      onResult(selectFace(result, selectedFaceIndex), () => captureFace(result, selectedFaceIndex), result.faceLandmarks.length);
+  async function detectFrame() {
+    if (stopped) return;
+    if (document.hidden) {
+      frameRequest = requestAnimationFrame(detectFrame);
+      return;
     }
-    frameRequest = requestAnimationFrame(detectFrame);
+    try {
+      if (
+        landmarker &&
+        video.videoWidth > 0 &&
+        video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+        video.currentTime !== lastVideoTime
+      ) {
+        lastVideoTime = video.currentTime;
+        let result: FaceLandmarkerResult;
+        try {
+          result = landmarker.detectForVideo(video, performance.now());
+        } catch (error) {
+          if (delegate === "CPU") throw error;
+          delegate = "CPU";
+          landmarker.close();
+          landmarker = undefined;
+          const replacement = await loadLandmarker();
+          if (stopped) {
+            replacement.close();
+            return;
+          }
+          landmarker = replacement;
+          lastVideoTime = -1;
+          frameRequest = requestAnimationFrame(detectFrame);
+          return;
+        }
+        const selectedFaceIndex = findClosestFaceToFrameCenter(result);
+        drawFaceBounds(result, selectedFaceIndex);
+        onResult(
+          selectFace(result, selectedFaceIndex),
+          () => captureFace(result, selectedFaceIndex),
+          result.faceLandmarks.length,
+        );
+      }
+      frameRequest = requestAnimationFrame(detectFrame);
+    } catch (error) {
+      stop();
+      onError(error);
+    }
+  }
+
+  function stop() {
+    stopped = true;
+    cancelAnimationFrame(frameRequest);
+    const current = landmarker;
+    landmarker = undefined;
+    current?.close();
   }
 
   // 顔の輪郭に余白を加えて切り出す。左右反転はカメラ表示に合わせる。
@@ -52,14 +116,18 @@ export function createFaceDetector({ video, canvas, onResult }: DetectorOptions)
     const landmarks = result.faceLandmarks[faceIndex];
     if (!landmarks) return "";
 
-    const xs = landmarks.map(point => point.x * video.videoWidth);
-    const ys = landmarks.map(point => point.y * video.videoHeight);
+    const xs = landmarks.map((point) => point.x * video.videoWidth);
+    const ys = landmarks.map((point) => point.y * video.videoHeight);
     const faceLeft = Math.min(...xs);
     const faceTop = Math.min(...ys);
     const faceWidth = Math.max(...xs) - faceLeft;
     const faceHeight = Math.max(...ys) - faceTop;
     const padding = Math.max(faceWidth, faceHeight) * 0.4;
-    const cropSize = Math.max(faceWidth, faceHeight) + padding * 2;
+    const cropSize = Math.min(
+      Math.max(faceWidth, faceHeight) + padding * 2,
+      video.videoWidth,
+      video.videoHeight,
+    );
     const centerX = faceLeft + faceWidth / 2;
     const centerY = faceTop + faceHeight / 2;
     const sourceX = Math.max(0, Math.min(video.videoWidth - cropSize, centerX - cropSize / 2));
@@ -75,7 +143,17 @@ export function createFaceDetector({ video, canvas, onResult }: DetectorOptions)
     photoContext.fillRect(0, 0, photo.width, photo.height);
     photoContext.translate(photo.width, 0);
     photoContext.scale(-1, 1);
-    photoContext.drawImage(video, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, photo.width, photo.height);
+    photoContext.drawImage(
+      video,
+      sourceX,
+      sourceY,
+      sourceWidth,
+      sourceHeight,
+      0,
+      0,
+      photo.width,
+      photo.height,
+    );
     return photo.toDataURL("image/jpeg", 0.9);
   }
 
@@ -108,11 +186,12 @@ export function createFaceDetector({ video, canvas, onResult }: DetectorOptions)
   }
 
   function drawFaceBounds(result: FaceLandmarkerResult, selectedIndex: number) {
+    if (!context) return;
     context.clearRect(0, 0, canvas.width, canvas.height);
     result.faceLandmarks.forEach((landmarks, index) => {
       if (!landmarks.length) return;
-      const xs = landmarks.map(point => point.x);
-      const ys = landmarks.map(point => point.y);
+      const xs = landmarks.map((point) => point.x);
+      const ys = landmarks.map((point) => point.y);
       const left = Math.min(...xs) * canvas.width;
       const top = Math.min(...ys) * canvas.height;
       const width = (Math.max(...xs) - Math.min(...xs)) * canvas.width;
@@ -132,12 +211,16 @@ export function createFaceDetector({ video, canvas, onResult }: DetectorOptions)
 
   return {
     async start() {
-      landmarker = await loadLandmarker();
+      if (!context) throw new Error("描画機能を利用できません。");
+      stopped = false;
+      const loaded = await loadLandmarker();
+      if (stopped) {
+        loaded.close();
+        return;
+      }
+      landmarker = loaded;
       frameRequest = requestAnimationFrame(detectFrame);
     },
-    stop() {
-      cancelAnimationFrame(frameRequest);
-      landmarker?.close();
-    },
+    stop,
   };
 }

@@ -17,9 +17,15 @@ jobs:
   build-deb:
     name: Build Ubuntu x64 .deb
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -28,6 +34,13 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Test camera and detector recovery
+        run: bunx vp test apps/website/tests/stability.test.ts
+
+      - name: Test desktop asset access
+        run: bun run test:desktop
+        working-directory: apps/website
 
       - name: Build Debian package
         run: bun run package:deb
@@ -40,3 +53,28 @@ jobs:
           path: dist/deb/FaceScan-*-amd64.deb
           if-no-files-found: error
           retention-days: 30
+
+  smoke-deb:
+    name: Install and launch on ${{ matrix.os }}
+    needs: build-deb
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: FaceScan-ubuntu-x64-deb
+          path: package
+      - name: Install package and virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb ./package/FaceScan-*-amd64.deb
+      - name: Check installed package without external model downloads
+        run: xvfb-run -a node apps/website/scripts/smoke-desktop.cjs /opt/FaceScan/facescan

@@ -11,7 +11,15 @@ type CaptureFlowOptions = {
 };
 
 export function createCaptureFlow(options: CaptureFlowOptions) {
-  const { countdown, photo, message, retakeButton, onFaceResult, getResultMessage, secondsToCount } = options;
+  const {
+    countdown,
+    photo,
+    message,
+    retakeButton,
+    onFaceResult,
+    getResultMessage,
+    secondsToCount,
+  } = options;
   let faceFirstSeenAt: number | undefined;
   let isShowingResult = false;
 
@@ -29,7 +37,9 @@ export function createCaptureFlow(options: CaptureFlowOptions) {
   }
 
   function showCapturedResult(capturePhoto: () => string) {
-    photo.src = capturePhoto();
+    const data = capturePhoto();
+    if (!data) return;
+    photo.src = data;
     photo.classList.add("is-visible");
     countdown.textContent = "";
     message.textContent = `判定結果 · ${getResultMessage()}`;
@@ -67,6 +77,7 @@ export function createCaptureFlow(options: CaptureFlowOptions) {
   return {
     update,
     dispose() {
+      retakeButton.removeEventListener("click", showLiveView);
       clearCountdown();
       showLiveView();
     },

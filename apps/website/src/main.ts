@@ -35,10 +35,10 @@ async function main() {
   const detector = createFaceDetector({
     video,
     canvas,
+    onError: handleFailure,
     onResult: (result, capturePhoto, detectedFaceCount) => {
-      focusStatus.textContent = detectedFaceCount > 0
-        ? `FOCUS · ${detectedFaceCount}`
-        : "FINDING FACE";
+      focusStatus.textContent =
+        detectedFaceCount > 0 ? `FOCUS · ${detectedFaceCount}` : "FINDING FACE";
       captureFlow.update(result, capturePhoto);
     },
   });
@@ -49,6 +49,40 @@ async function main() {
   };
 
   let stopCamera = () => {};
+  let disposed = false;
+  const retry = document.createElement("button");
+  retry.type = "button";
+  retry.textContent = "再試行";
+  retry.hidden = true;
+  retry.addEventListener("click", () => window.location.reload());
+  status.parentElement!.append(retry);
+
+  function handleFailure(error: unknown) {
+    console.error("Face Scan の処理に失敗しました:", error);
+    stopCamera();
+    detector.stop();
+    captureFlow.dispose();
+    expression.dispose();
+    setStatus("ERROR", true);
+    focusStatus.textContent = "STOPPED";
+    expression.showError(
+      error instanceof Error ? error.message : "カメラとモデルの読み込みを確認してください。",
+    );
+    retry.hidden = false;
+  }
+
+  window.addEventListener(
+    "beforeunload",
+    () => {
+      disposed = true;
+      stopCamera();
+      detector.stop();
+      expression.dispose();
+      captureFlow.dispose();
+    },
+    { once: true },
+  );
+
   try {
     setStatus("CONNECTING");
     stopCamera = await startCamera({
@@ -56,24 +90,19 @@ async function main() {
       canvas,
       frame: getElement<HTMLDivElement>("#camera-frame"),
       placeholder: getElement<HTMLDivElement>("#camera-placeholder"),
+      onEnded: () =>
+        handleFailure(new Error("カメラの接続が切れました。接続を確認して再試行してください。")),
     });
-    setStatus("CAMERA ON");
+    if (disposed || !retry.hidden) {
+      stopCamera();
+      return;
+    }
+    setStatus("LOADING MODEL");
     await detector.start();
-    setStatus("SCANNING");
+    if (!disposed && retry.hidden) setStatus("SCANNING");
   } catch (error) {
-    console.error("Face Scan の起動に失敗しました:", error);
-    stopCamera();
-    detector.stop();
-    setStatus("ERROR", true);
-    expression.showError(error instanceof Error ? error.message : "カメラとモデルの読み込みを確認してください。");
+    if (!disposed) handleFailure(error);
   }
-
-  window.addEventListener("beforeunload", () => {
-    stopCamera();
-    detector.stop();
-    expression.dispose();
-    captureFlow.dispose();
-  }, { once: true });
 }
 
 void main();
